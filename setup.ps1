@@ -1,5 +1,4 @@
-# setup.ps1 — Claude Code 用户级工程体系一键部署脚本
-# Version: 1.0.0
+# setup.ps1 — Claude Code 用户级工程体系一键部署脚本 v1.0.0
 # 用法:
 #   git clone https://github.com/flasherses/claude-code-dotfiles.git ~/.claude-config
 #   cd ~/.claude-config
@@ -9,63 +8,145 @@ $ErrorActionPreference = "Stop"
 $Version = "1.0.0"
 $ClaudeDir = "$env:USERPROFILE\.claude"
 
-Write-Host "=== Claude Code Dotfiles v$Version ==="
+Write-Host ""
+Write-Host "============================================"
+Write-Host "  Claude Code Dotfiles v$Version"
+Write-Host "  User-level Engineering System Deployment"
+Write-Host "============================================"
+Write-Host ""
 
-Write-Host "=== Claude Code 用户级工程体系部署 ==="
+# ── Step 1: Ensure target directory ───────────────────────
 
-# 1. 确保 .claude 目录存在
+Write-Host "[1/6] Preparing ~/.claude/..."
 if (-not (Test-Path $ClaudeDir)) {
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
+    Write-Host "  Created: $ClaudeDir"
+} else {
+    Write-Host "  Exists: $ClaudeDir"
 }
 
-# 2. 复制配置文件
-Write-Host "`n[1/5] 复制配置文件..."
-Copy-Item -Path ".\CLAUDE.md" -Destination "$ClaudeDir\CLAUDE.md" -Force
-Copy-Item -Path ".\rules" -Destination "$ClaudeDir\rules" -Recurse -Force
-Copy-Item -Path ".\agents" -Destination "$ClaudeDir\agents" -Recurse -Force
-Copy-Item -Path ".\commands" -Destination "$ClaudeDir\commands" -Recurse -Force
-Copy-Item -Path ".\hooks" -Destination "$ClaudeDir\hooks" -Recurse -Force
-Write-Host "  ✅ CLAUDE.md + rules/ + agents/ + commands/ + hooks/"
+# ── Step 2: Deploy config files ───────────────────────────
 
-# 3. 生成 settings.json（自动替换路径中的用户名）
-Write-Host "`n[2/5] 生成 settings.json..."
+Write-Host ""
+Write-Host "[2/6] Deploying config files..."
+
+$items = @(
+    @{Src=".\CLAUDE.md";       Dst="$ClaudeDir\CLAUDE.md";       Label="CLAUDE.md"},
+    @{Src=".\rules";           Dst="$ClaudeDir\rules";           Label="rules/"},
+    @{Src=".\agents";          Dst="$ClaudeDir\agents";          Label="agents/"},
+    @{Src=".\commands";        Dst="$ClaudeDir\commands";        Label="commands/"},
+    @{Src=".\hooks";           Dst="$ClaudeDir\hooks";           Label="hooks/"},
+    @{Src=".\skills";          Dst="$ClaudeDir\skills";          Label="skills/"}
+)
+
+foreach ($item in $items) {
+    if (Test-Path $item.Src) {
+        Copy-Item -Path $item.Src -Destination $item.Dst -Recurse -Force
+        $count = if (Test-Path $item.Src -PathType Container) {
+            (Get-ChildItem $item.Src -Recurse -File).Count
+        } else { 1 }
+        Write-Host "  OK  $($item.Label) ($count files)"
+    } else {
+        Write-Host "  SKIP $($item.Label) (not found)"
+    }
+}
+
+# ── Step 3: Generate settings.json ────────────────────────
+
+Write-Host ""
+Write-Host "[3/6] Generating settings.json..."
+
 if (Test-Path "$ClaudeDir\settings.json") {
-    Write-Host "  ⚠️ settings.json 已存在，跳过（保护现有配置）"
-    Write-Host "  如需更新，请手动对比 settings.example.json"
+    Write-Host "  SKIP settings.json already exists (protecting existing config)"
+    Write-Host "  To update: compare with .\settings.example.json manually"
 } else {
     $example = Get-Content ".\settings.example.json" -Raw
-    # 替换 __CLAUDE_HOME__ 占位符为实际路径
     $claudeHome = $ClaudeDir -replace '\\', '\\'
     $example = $example -replace '__CLAUDE_HOME__', $claudeHome
     $example | Set-Content -Path "$ClaudeDir\settings.json" -Encoding utf8
-    Write-Host "  ✅ settings.json 已生成（Hook 路径已自动适配: $ClaudeDir）"
-    Write-Host "  ⚠️ 请手动编辑 ~/.claude/settings.json 填入你的 API Key"
+    Write-Host "  OK  settings.json generated (paths adapted to: $ClaudeDir)"
+    Write-Host ""
+    Write-Host "  !!! IMPORTANT: Edit ~/.claude/settings.json and add your API Key !!!"
+    Write-Host "      notepad $ClaudeDir\settings.json"
 }
 
-# 4. 创建必要目录
-Write-Host "`n[3/5] 创建目录结构..."
+# ── Step 4: Create runtime directories ────────────────────
+
+Write-Host ""
+Write-Host "[4/6] Creating runtime directories..."
 $dirs = @("$ClaudeDir\audit", "$ClaudeDir\state", "$ClaudeDir\projects")
 foreach ($d in $dirs) {
     if (-not (Test-Path $d)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
 }
-Write-Host "  ✅ audit/ + state/ + projects/"
+Write-Host "  OK  audit/ + state/ + projects/"
 
-# 5. 安装 Skills（通过 marketplace）
-Write-Host "`n[4/5] 安装 Skills..."
-Write-Host "  执行: claude plugin install superpowers@claude-plugins-official"
+# ── Step 5: Install marketplace skills (optional) ──────────
+
+Write-Host ""
+Write-Host "[5/6] Installing Superpowers skills (optional)..."
 try {
-    claude plugin install superpowers@claude-plugins-official 2>$null
-    Write-Host "  ✅ Superpowers Skills 安装完成"
+    $claudeExists = Get-Command claude -ErrorAction SilentlyContinue
+    if ($claudeExists) {
+        claude plugin install superpowers@claude-plugins-official 2>$null
+        Write-Host "  OK  Superpowers skills installed"
+    } else {
+        Write-Host "  SKIP Claude Code CLI not found — install manually later:"
+        Write-Host "       /plugin install superpowers@claude-plugins-official"
+    }
 } catch {
-    Write-Host "  ⚠️ 自动安装失败，请手动在 Claude Code 中运行:"
-    Write-Host "     /plugin install superpowers@claude-plugins-official"
+    Write-Host "  SKIP Automatic install failed. Install manually in Claude Code:"
+    Write-Host "       /plugin install superpowers@claude-plugins-official"
 }
 
-Write-Host "`n[5/5] 完成！"
-Write-Host "`n=== 验证 ==="
-Write-Host "在新 Claude Code 对话中测试:"
-Write-Host "  1. 'What are my coding preferences?' → 应引用 CLAUDE.md"
-Write-Host "  2. '/review' → 应触发代码审查流程"
-Write-Host "  3. '帮我审查这段代码' → 应触发 code-reviewer agent"
+# ── Step 6: Verify deployment ──────────────────────────────
+
+Write-Host ""
+Write-Host "[6/6] Verifying deployment..."
+
+$checks = @{
+    "CLAUDE.md"         = (Test-Path "$ClaudeDir\CLAUDE.md")
+    "rules/"            = (Test-Path "$ClaudeDir\rules")
+    "agents/"           = (Test-Path "$ClaudeDir\agents")
+    "commands/"         = (Test-Path "$ClaudeDir\commands")
+    "hooks/"            = (Test-Path "$ClaudeDir\hooks")
+    "skills/"           = (Test-Path "$ClaudeDir\skills")
+    "settings.json"     = (Test-Path "$ClaudeDir\settings.json")
+    "audit/"            = (Test-Path "$ClaudeDir\audit")
+}
+$allOk = $true
+foreach ($check in $checks.GetEnumerator()) {
+    if ($check.Value) {
+        Write-Host "  OK  $($check.Key)"
+    } else {
+        Write-Host "  MISS  $($check.Key)"
+        $allOk = $false
+    }
+}
+
+# ── Done ───────────────────────────────────────────────────
+
+Write-Host ""
+Write-Host "============================================"
+if ($allOk) {
+    Write-Host "  Deployment complete!"
+} else {
+    Write-Host "  Deployment complete (some items skipped)."
+}
+Write-Host "============================================"
+Write-Host ""
+Write-Host "What you have now:"
+Write-Host "  5 Agents    — code-reviewer, security-auditor, doc-explorer, test-runner, pr-drafter"
+Write-Host "  10 Hooks    — 5 event types, dual platform (ps1+sh)"
+Write-Host "  6 Skills    — project-engineering-init, git-rollback, smart-review + 3 team skills"
+Write-Host "  4 Commands  — /review, /audit, /full-review, /rollback"
+Write-Host "  2 Rules     — security.md, code-style.md"
+Write-Host ""
+Write-Host "Next steps:"
+Write-Host "  1. Edit settings.json and add your API Key"
+Write-Host "  2. Start a new Claude Code session"
+Write-Host "  3. Verify: ask 'What are my coding preferences?'"
+Write-Host "  4. In any project: say 'build the engineering system for this project'"
+Write-Host "  5. Run health check: cd ~/.claude-config && powershell -File scripts/health-check.ps1"
+Write-Host ""

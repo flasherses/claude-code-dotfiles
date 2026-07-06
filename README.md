@@ -98,13 +98,37 @@ powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1
 notepad ~/.claude/settings.json
 ```
 
-部署后在任意项目中验证：
+### 部署后你会得到什么
+
+执行 `setup.ps1` 后，你的 `~/.claude/` 目录下会出现：
+
+| 部署内容 | 数量 | 说明 |
+|----------|:--:|------|
+| Agents | 5 | 自动触发，不需要记名字。说"审查代码"就触发 code-reviewer |
+| Hooks | 10 | 5 种事件 × 双平台。拦截危险命令、审计文件修改、检测 PII 泄露 |
+| Skills | 6 | 3 个手写（工程化搭建/回滚/智能审查）+ 3 个团队模板 |
+| Commands | 4 | `/review` `/audit` `/full-review` `/rollback` |
+| Rules | 2 | 安全红线 + 编码规范。所有项目自动生效 |
+| settings.json | 1 | 权限规则 + Hook 注册。路径自动适配你的用户名 |
+| 运维脚本 | 8 | 健康检查/冲突检测/MCP 验证/Token 分析（在仓库目录中，非 ~/.claude/） |
+
+### 部署后还需要手动做的事
+
+| 事项 | 说明 |
+|------|------|
+| 填入 API Key | 编辑 `~/.claude/settings.json`，将 `<你的 DeepSeek API Key>` 替换为真实 Key |
+| 安装 Superpowers Skills | setup.ps1 会自动尝试安装，如果失败，在 Claude Code 中运行 `/plugin install superpowers@claude-plugins-official` |
+| 项目工程化 | 在每个项目根目录说"帮我搭建这个项目的工程化体系"，触发 project-engineering-init Skill |
+| MCP（可选） | 按 `mcp/GUIDE.md` 配置 GitHub MCP 等外部连接 |
+
+### 验证部署成功
+
+在新 Claude Code 对话中：
 
 ```
-"帮我审查最近改的代码"        → code-reviewer agent 自动触发
-"安全审计一下"               → security-auditor agent 自动触发
-"帮我搭建这个项目的工程化体系"  → project-engineering-init Skill 自动生成全套项目配置
-/health-check               → 一键健康检查
+"What are my coding preferences?"    → 应引用 CLAUDE.md 内容
+"/review"                            → 应触发代码审查流程
+"帮我搭建这个项目的工程化体系"        → 应触发 project-engineering-init Skill
 ```
 
 ---
