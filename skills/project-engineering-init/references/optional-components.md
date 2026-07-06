@@ -159,10 +159,10 @@ exit 0
 ```json
 "PreToolUse": [{
   "matcher": "Bash",
-  "hooks": [{"type": "command", "command": "powershell ... -File .claude/hooks/block-sensitive.ps1"}]
+  "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\block-sensitive.ps1"}]
 }, {
   "matcher": "Edit|Write",
-  "hooks": [{"type": "command", "command": "powershell ... -File .claude/hooks/block-sensitive.ps1"}]
+  "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\block-sensitive.ps1"}]
 }]
 ```
 
@@ -206,6 +206,6 @@ exit 0
 ```json
 "PostToolUse": [{
   "matcher": "Edit|Write",
-  "hooks": [{"type": "command", "command": "powershell ... -File .claude/hooks/compile-check.ps1"}]
+  "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\compile-check.ps1"}]
 }]
 ```

@@ -147,22 +147,197 @@ Test-Path ".\pom.xml"  # 或 package.json / go.mod / Cargo.toml / requirements.t
 ```json
 {
   "permissions": {
-    "allow": [读文件 + 构建命令 + 运行命令 + git 只读],
-    "ask":  [Edit/Write 所有源码 + git add/commit/checkout],
-    "deny": [rm -rf, curl|sh, git push -f, mvn deploy, 编辑敏感配置]
+    "allow": [
+      "Read(<项目根绝对路径>\\**)",   // ❗ 必须限定项目路径，禁用 Read(*)
+      "Glob(<项目根绝对路径>\\**)",
+      "Grep(<项目根绝对路径>\\**)",
+      "Bash(<构建命令>*)",
+      "Bash(<运行命令>*)",
+      "Bash(git diff*|status*|log*|branch*)"
+    ],
+    "ask": [
+      "Edit(<项目根绝对路径>\\**)",    // ❗ 必须限定项目路径
+      "Write(<项目根绝对路径>\\**)",
+      "Bash(git add*|commit*|checkout*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)", "Bash(curl*|*sh*)",
+      "Bash(git push*--force*)", "Bash(git push*-f*)",
+      "PowerShell(mvn deploy*)",
+      "Edit(<项目根绝对路径>\\**\\application-prod*.yml)",
+      "Edit(<项目根绝对路径>\\**\\.env*)",
+      "Edit(<项目根绝对路径>\\.claude\\settings.json)"
+    ]
   }
 }
 ```
 
+**❗ 强制规则（不遵守会导致安全问题）**:
+- **Read/Glob/Grep 必须限定项目路径** — `Read(D:\\path\\to\\project\\**)` 而非 `Read(*)`。`Read(*)` 让 Claude 能读系统上任何文件
+- **Edit/Write 必须限定项目路径** — 同上
+- **路径用绝对路径 + 正斜杠** — `D:/project/**` 格式
+- **deny 中包含 `.claude/settings.json`** — 防止 AI 修改自身权限
+
 ### 3.4 .claude/rules/
 
-**编码规范** (`<lang>-conventions.md`): 命名约定 → 框架模式 → 文件组织 → 日志 → 异常处理。每个规则解释 WHY。
+**❗ 强制：每个 rule 文件必须包含 YAML frontmatter**。无 frontmatter 的 rule 会在每次对话全程加载，浪费上下文。
 
-**安全规范** (`security.md`): 凭据管理 → 注入防护 → 审计日志 → 禁止项清单。
+**编码规范** (`<lang>-conventions.md`):
 
-### 3.5-3.8 可选组件
+```markdown
+---
+description: <项目名> <语言>编码规范。创建或修改 <扩展名> 文件时生效。
+paths:
+  - "**/*.<ext>"
+---
+
+# <语言>编码规范
+
+## 命名约定
+[表：类型 → 规范 → 示例]
+
+## <框架>使用
+[关键模式：如何创建新模块、依赖注入方式、ORM 模式]
+
+## 日志规范
+[用什么日志库、级别选择、不要怎么做]
+
+## 异常处理
+[如何处理异常、哪里处理、哪里不处理]
+```
+
+**安全规范** (`security.md`):
+
+```markdown
+---
+description: <项目名>安全红线。修改代码/配置/环境变量文件时重点生效。
+paths:
+  - "**/*.<ext>"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.xml"
+  - "**/.env*"
+---
+
+# 项目安全红线
+
+## 1. 凭据管理
+[根据探测结果：硬编码禁止 / 加密方式 / 环境变量]
+
+## 2. <数据库/API>安全
+[SQL 注入防护 / API Key 管理 / 参数化查询]
+
+## 3. 代码中不得出现
+[具体的禁止项列表]
+```
+
+**关键规则**:
+- `paths` 字段决定何时加载 — 只在匹配的文件被操作时激活
+- `description` 字段说明规则用途 — AI 可据此判断是否相关
+- 不要设 `paths: ["**/*"]` 全局生效 — 那和没有 frontmatter 一样浪费
+
+### 3.5-3.7 Skills/Commands/Agents
 
 按阶段 2 的决策树结果生成。具体模板见 `references/optional-components.md`。
+
+### 3.8 .claude/hooks/ — 必须同时更新 settings.json
+
+**❗ 强制：生成 Hook 脚本后，必须立即在 settings.json 中添加对应的 hooks 区块。**
+缺失 hooks 注册 = Hook 脚本永远不会被执行（死代码）。
+
+**block-sensitive.ps1**（PreToolUse — 阻断敏感操作）:
+
+```powershell
+# block-sensitive.ps1 — PreToolUse hook
+# ❗ 使用 stdin JSON 读取工具调用信息，不是 git diff
+# Exit 0 = allow, Exit 2 = deny
+
+$rawInput = $input | Out-String
+if (-not $rawInput) { exit 0 }
+try { $data = $rawInput | ConvertFrom-Json } catch { exit 0 }
+
+$toolName = $data.tool_name
+
+# Block deploy
+if ($toolName -eq 'Bash' -and $data.tool_input.command -match '<deploy pattern>') {
+    [Console]::Error.WriteLine("DENIED: <reason>")
+    exit 2
+}
+
+# Block git push
+if ($toolName -eq 'Bash' -and $data.tool_input.command -match 'git\s+push\b') {
+    [Console]::Error.WriteLine("DENIED: git push requires manual confirmation.")
+    exit 2
+}
+
+# Block editing sensitive files
+if ($toolName -in @('Edit', 'Write')) {
+    $fileName = Split-Path $data.tool_input.file_path -Leaf
+    if ($fileName -match '<sensitive file pattern>') {
+        [Console]::Error.WriteLine("DENIED: Cannot modify $fileName")
+        exit 2
+    }
+}
+
+exit 0
+```
+
+**compile-check.ps1**（PostToolUse — 编辑后自动编译）:
+
+```powershell
+# compile-check.ps1 — PostToolUse hook
+# Exit 0 always (never blocks — compile failure is informational)
+
+$rawInput = $input | Out-String
+if (-not $rawInput) { exit 0 }
+try { $data = $rawInput | ConvertFrom-Json } catch { exit 0 }
+
+$toolName = $data.tool_name
+if ($toolName -notin @('Edit', 'Write')) { exit 0 }
+
+$filePath = $data.tool_input.file_path
+if ($filePath -notmatch '\.<source-ext>$') { exit 0 }
+
+# Determine module (if multi-module)
+$module = '<default>'
+if ($filePath -match '<module-pattern>') { $module = '<module>' }
+
+$result = <build cmd> -pl $module -q 2>&1
+if ($LASTEXITODE -ne 0) {
+    [Console]::Error.WriteLine("FAIL: Compile error in $module after editing $(Split-Path $filePath -Leaf)")
+    [Console]::Error.WriteLine($result)
+}
+exit 0
+```
+
+**注册到 settings.json**（❗ 此步骤不可省略）:
+
+```json
+"hooks": {
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\block-sensitive.ps1\""}]
+    },
+    {
+      "matcher": "Edit|Write",
+      "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\block-sensitive.ps1\""}]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "Edit|Write",
+      "hooks": [{"type": "command", "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<项目根>\\.claude\\hooks\\compile-check.ps1\""}]
+    }
+  ]
+}
+```
+
+**关键规则**:
+- **必须读 stdin JSON** — Hook 接收 JSON 格式的工具调用信息
+- **exit 2 = 阻断, exit 0 = 放行** — 不要用 exit 1
+- **`-ExecutionPolicy Bypass` 必须加** — Windows PowerShell 5.1 默认禁止脚本
+- **两个 matcher** — Bash（拦截命令）+ Edit|Write（拦截文件修改）
 
 ---
 
@@ -190,7 +365,15 @@ Get-ChildItem .claude/hooks/*.ps1 | ForEach-Object {
     else { Write-Host "$($_.Name): FAIL — $errors" }
 }
 
-# 5. .gitignore 不排除应提交的文件
+# 5. 如果有 hooks/ 目录，确认 settings.json 中已注册
+$hasHooks = Test-Path ".claude/hooks/*.ps1"
+$hasHookReg = $s.hooks
+if ($hasHooks -and -not $hasHookReg) {
+    Write-Host "FAIL: Hook scripts exist in .claude/hooks/ but are NOT registered in settings.json"
+    Write-Host "  Add a 'hooks' section to .claude/settings.json"
+}
+
+# 6. .gitignore 不排除应提交的文件
 $gitignore = Get-Content .gitignore -Raw
 if ($gitignore -match '^CLAUDE\.md|^\.claude/' -and $gitignore -notmatch '\.claude/(audit|state|sessions|worktrees|settings\.local)') {
     Write-Host "WARNING: .gitignore may exclude shared Claude config files"
@@ -203,6 +386,11 @@ if ($gitignore -match '^CLAUDE\.md|^\.claude/' -and $gitignore -notmatch '\.clau
 
 | 错误 | 后果 | 正确做法 |
 |------|------|----------|
+| **Read/Glob/Grep 用 `*` 通配符** | Claude 能读系统上任何文件 | `Read(D:\\path\\to\\project\\**)` 限定项目路径 |
+| **Hook 生成后不在 settings.json 注册** | Hook 脚本永久不执行（死代码）| 生成 hook 脚本后立即加 hooks 区块 |
+| **Rules 缺 YAML frontmatter** | 每次对话全程加载，浪费上下文 | 加 `paths:` 条件匹配只在相关文件操作时激活 |
+| **Hook 用 exit 1 而非 exit 2** | 阻断失效，Hook 协议只认 exit 2 | PreToolUse 阻断用 `exit 2` |
+| **Hook 用 git diff 而非 stdin JSON** | 无法在命令执行前阻断，只能事后扫描 | 读 stdin JSON 获取 tool_name + tool_input |
 | CLAUDE.md 超过 400 行 | 上下文窗口争抢，高频信息被稀释 | 100-300 行，超过拆到 rules/ |
 | .gitignore 加了 `.claude/` 整体 | 团队共享的 settings.json/rules/ 被排除 | 只排除 `.claude/audit/` `.claude/state/` `.claude/sessions/` `.claude/worktrees/` `.claude/settings.local.json` |
 | settings.json deny 超过 10 条 | 过多拦截阻碍正常开发 | 5-8 条真正危险的 |
