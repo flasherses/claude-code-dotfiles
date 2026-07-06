@@ -17,15 +17,15 @@ if (-not $command) { exit 0 }
 
 # Patterns that must NEVER execute automatically
 $dangerous = @(
-    @{pattern = 'rm\s+-rf';                  reason = 'Recursive force delete — irreversible data loss'},
-    @{pattern = 'rm\s+-r\s+/';               reason = 'Recursive delete from root — system destruction'},
-    @{pattern = 'curl.*\|\s*(sh|bash|sudo)'; reason = 'Pipe curl to shell — remote code execution risk'},
-    @{pattern = 'wget.*\|\s*(sh|bash|sudo)'; reason = 'Pipe wget to shell — remote code execution risk'},
-    @{pattern = 'git\s+push\s+.*--force';    reason = 'Force push — overwrites remote history'},
-    @{pattern = 'git\s+push\s+.*-f\b';       reason = 'Force push (-f) — overwrites remote history'},
-    @{pattern = 'chmod\s+777';               reason = 'World-writable permissions — security risk'},
-    @{pattern = 'dd\s+if=';                  reason = 'Raw disk write — irreversible data loss'},
-    @{pattern = 'mkfs\.';                    reason = 'Filesystem format — destroys all data on target'}
+    @{pattern = 'rm\s+-rf';                  reason = 'Recursive force delete - irreversible data loss'},
+    @{pattern = 'rm\s+-r\s+/';               reason = 'Recursive delete from root - system destruction'},
+    @{pattern = 'curl.*\|\s*(sh|bash|sudo)'; reason = 'Pipe curl to shell - remote code execution risk'},
+    @{pattern = 'wget.*\|\s*(sh|bash|sudo)'; reason = 'Pipe wget to shell - remote code execution risk'},
+    @{pattern = 'git\s+push\s+.*--force';    reason = 'Force push - overwrites remote history'},
+    @{pattern = 'git\s+push\s+.*-f\b';       reason = 'Force push (-f) - overwrites remote history'},
+    @{pattern = 'chmod\s+777';               reason = 'World-writable permissions - security risk'},
+    @{pattern = 'dd\s+if=';                  reason = 'Raw disk write - irreversible data loss'},
+    @{pattern = 'mkfs\.';                    reason = 'Filesystem format - destroys all data on target'}
 )
 
 foreach ($entry in $dangerous) {
