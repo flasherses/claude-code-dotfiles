@@ -1,172 +1,172 @@
 # Claude Code Dotfiles
 
-User-level engineering system for Claude Code. Built on Windows 11 + PowerShell 5.1, compatible with DeepSeek API proxy. Based on the course "Claude Code Engineering Practice" (Geektime, Huang Jia).
+Claude Code 用户级工程化配置体系。基于 Windows 11 + PowerShell 5.1，兼容 DeepSeek API 代理。依据极客时间《Claude Code 工程化实战》(黄佳老师) 课程搭建。
 
-## Quick Start
+## 快速开始
 
 ```powershell
-# 1. Clone
+# 1. 克隆仓库
 git clone git@github.com:flasherses/claude-code-dotfiles.git ~/.claude-config
 
-# 2. Deploy
+# 2. 一键部署
 cd ~/.claude-config
 powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1
 
-# 3. Edit API key
+# 3. 填入 API Key
 notepad ~/.claude/settings.json
 ```
 
-## Architecture
+## 架构总览
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                   Foundation                     │
-│  CLAUDE.md  +  Rules (security, code-style)      │
-│  settings.json  (permissions: 8 allow + 9 deny)  │
+│                     基础层                        │
+│  CLAUDE.md  +  Rules(安全红线 + 编码规范)          │
+│  settings.json  (权限: 8 allow + 9 deny)          │
 ├─────────────────────────────────────────────────┤
-│                   Execution                      │
-│  SubAgents ×4   Skills ×13   Commands ×4        │
+│                     执行层                        │
+│  SubAgent ×4   Skill ×13   Command ×4            │
 ├─────────────────────────────────────────────────┤
-│                  Governance                       │
-│  Hooks ×4  (PreToolUse, PostToolUse,             │
-│             Stop, SubagentStop)                  │
+│                     治理层                        │
+│  Hook ×4  (PreToolUse, PostToolUse,              │
+│            Stop, SubagentStop)                   │
 ├─────────────────────────────────────────────────┤
-│                   Runtime                        │
-│  Superpowers Plugin v5.1.0  +  setup.ps1        │
+│                     运行层                        │
+│  Superpowers Plugin v5.1.0  +  setup.ps1         │
 └─────────────────────────────────────────────────┘
 ```
 
-## File Structure
+## 目录结构
 
 ```
 ~/.claude/
-├── CLAUDE.md                          # Personal preferences & forbidden zones
-├── README.md                          # This file
-├── setup.ps1                          # One-command deployment script
-├── settings.example.json              # Config template (no secrets)
-├── .gitignore                         # Excludes token, cache, skills, plugins
+├── CLAUDE.md                          # 用户级记忆：偏好、禁区、常用命令
+├── README.md                          # 本文件
+├── setup.ps1                          # 一键部署脚本
+├── settings.example.json              # 配置模板（不含 token）
+├── .gitignore                         # 排除 token/缓存/skills/plugins
 │
 ├── rules/
-│   ├── security.md                    # Security red lines (all projects)
-│   └── code-style.md                  # Coding conventions (all projects)
+│   ├── security.md                    # 通用安全红线（所有项目生效）
+│   └── code-style.md                  # 通用编码规范（所有项目生效）
 │
 ├── agents/
-│   ├── code-reviewer.md               # Read-only code review (sonnet)
-│   ├── security-auditor.md            # Read-only security audit (sonnet)
-│   ├── doc-explorer.md                # Read-only code exploration (haiku)
-│   └── test-runner.md                 # Executable test runner (haiku)
+│   ├── code-reviewer.md               # 只读 — 代码审查 (sonnet)
+│   ├── security-auditor.md            # 只读 — 安全审计 (sonnet)
+│   ├── doc-explorer.md                # 只读 — 代码探索 (haiku)
+│   └── test-runner.md                 # 可执行 — 测试运行 (haiku)
 │
 ├── commands/
-│   ├── review.md                      # Sequential review
-│   ├── audit.md                       # Security-only audit
-│   ├── full-review.md                 # Parallel multi-agent review
-│   └── rollback.md                    # Git commit rollback
+│   ├── review.md                      # /review — 顺序审查
+│   ├── audit.md                       # /audit — 安全审计
+│   ├── full-review.md                 # /full-review — 并行全量审查
+│   └── rollback.md                    # /rollback — 回滚最近 commit
 │
 ├── hooks/
-│   ├── deny-dangerous.ps1             # PreToolUse: block rm -rf, curl|sh, etc.
-│   ├── audit-edit.ps1                 # PostToolUse: log all Edit/Write ops
-│   ├── check-uncommitted.ps1          # Stop: 4-step quality gate
-│   └── validate-subagent.ps1          # SubagentStop: validate output format
+│   ├── deny-dangerous.ps1             # PreToolUse — 拦截危险命令
+│   ├── audit-edit.ps1                 # PostToolUse — Edit/Write 审计日志
+│   ├── check-uncommitted.ps1          # Stop — 四步质量门
+│   └── validate-subagent.ps1          # SubagentStop — 子代理输出验收
 │
 ├── skills/
-│   ├── git-rollback/                  # Custom: safe commit rollback
+│   ├── git-rollback/                  # 自定义：安全回滚（双锁模式）
 │   │   └── SKILL.md                   #   disable-model-invocation: true
-│   └── [12 Superpowers skills]        # Marketplace-installed
+│   └── [12 个 Superpowers Skills]     # Marketplace 安装
 │
 └── plugins/
     └── superpowers@claude-plugins-official (v5.1.0)
 ```
 
-## Usage Guide
+## 使用指南
 
-### Slash Commands
+### 斜杠命令
 
-| Command | Usage | What it does |
-|---------|-------|-------------|
-| `/review [path]` | Quick code check | Sequential: code-reviewer then security-auditor |
-| `/audit [path]` | Security-only | Single security-auditor scan |
-| `/full-review [path]` | Comprehensive | Parallel: reviewer + auditor + explorer simultaneously |
-| `/rollback [mode]` | Undo last commit | `--soft` / `--mixed` (default) / `--hard` (double confirm) |
+| 命令 | 用途 | 执行方式 |
+|------|------|----------|
+| `/review [路径]` | 快速代码检查 | 顺序：code-reviewer → security-auditor |
+| `/audit [路径]` | 纯安全审计 | 单一 security-auditor 扫描 |
+| `/full-review [路径]` | 全面审查 | 并行：reviewer + auditor + explorer 同时跑 |
+| `/rollback [模式]` | 撤销最近 commit | `--soft` / `--mixed`(默认) / `--hard`(二次确认) |
 
-### Sub-Agents (auto-triggered by description matching)
+### 子代理（通过描述自动匹配触发）
 
-| Agent | Tools | Triggers when you say... |
-|-------|-------|--------------------------|
-| code-reviewer | Read, Grep, Glob | "review this code", "审查", "检查代码" |
-| security-auditor | Read, Grep, Glob | "security audit", "安全审计", "check for vulnerabilities" |
-| doc-explorer | Grep, Glob, Read | "how does X work", "find where Y is", "探索项目" |
-| test-runner | Read, Grep, Glob, Bash | "run tests", "跑测试", "check if tests pass" |
+| Agent | 工具 | 当你说这些时自动触发... |
+|-------|------|--------------------------|
+| code-reviewer | Read, Grep, Glob | "review this code"、"审查"、"检查代码" |
+| security-auditor | Read, Grep, Glob | "security audit"、"安全审计"、"check for vulnerabilities" |
+| doc-explorer | Grep, Glob, Read | "how does X work"、"find where Y is"、"探索项目" |
+| test-runner | Read, Grep, Glob, Bash | "run tests"、"跑测试"、"check if tests pass" |
 
-### Hook Events
+### Hook 事件
 
-| Event | Script | Action |
-|-------|--------|--------|
-| Before Bash runs | `deny-dangerous.ps1` | Blocks `rm -rf`, `curl\|sh`, `git push -f`, etc. |
-| After Edit/Write | `audit-edit.ps1` | Logs operation to `~/.claude/audit/<date>.log` |
-| Before session stops | `check-uncommitted.ps1` | 4-step quality gate (warn only) |
-| After sub-agent completes | `validate-subagent.ps1` | Validates output format; retries if malformed |
+| 事件 | 脚本 | 行为 |
+|------|------|------|
+| Bash 执行前 | `deny-dangerous.ps1` | 拦截 `rm -rf`、`curl\|sh`、`git push -f` 等 |
+| Edit/Write 后 | `audit-edit.ps1` | 操作记入 `~/.claude/audit/<日期>.log` |
+| 会话停止前 | `check-uncommitted.ps1` | 四步质量门检查（仅警告不阻断） |
+| 子代理完成后 | `validate-subagent.ps1` | 校验输出格式，不合格则要求重来 |
 
-### Skills (auto-triggered by description matching)
+### Skills（通过描述自动匹配触发）
 
-| Skill | Purpose |
-|-------|---------|
-| project-kickstart | Initialize new projects with CLAUDE.md |
-| project-scout | Map unfamiliar codebases |
-| diagnose | Structured debugging loop |
-| tdd | Red-green-refactor test-driven development |
-| agent-browser | Browser automation for testing/scraping |
-| spec-coach | Refine requirements into implementation plans |
-| grill-me | Stress-test design decisions |
-| improve-codebase-architecture | Find architectural improvements |
-| write-a-skill | Create new Claude Code skills |
-| caveman | Ultra-compact token-saving mode |
-| zoom-out | Broader context perspective |
-| **git-rollback** | Safe git commit rollback (manual trigger only) |
+| Skill | 用途 |
+|-------|------|
+| project-kickstart | 新项目初始化，自动生成 CLAUDE.md |
+| project-scout | 陌生代码库探索，生成结构化报告 |
+| diagnose | 结构化调试：重现→缩小→假设→修复→回归 |
+| tdd | 红-绿-重构测试驱动开发 |
+| agent-browser | 浏览器自动化（测试、抓取、表单填写） |
+| spec-coach | 需求引导→实施计划 |
+| grill-me | 设计方案压力测试 |
+| improve-codebase-architecture | 代码库架构深化分析 |
+| write-a-skill | 创建新的 Claude Code Skill |
+| caveman | Token 节省模式（减少约 75%） |
+| zoom-out | 上下文视角切换 |
+| **git-rollback** | 安全回滚最后一次 commit（仅手动触发） |
 
-## Security Model (6-Layer Defense)
+## 安全模型（6 层纵深防御）
 
 ```
-Layer 1: settings.json deny rules    — Permission-level block
-Layer 2: rules/security.md           — Soft guidance on why
-Layer 3: PreToolUse Hook             — Real-time regex interception
-Layer 4: PostToolUse Hook            — Audit trail for every edit
-Layer 5: SubAgent tool whitelist     — Role isolation (read-only by default)
-Layer 6: Stop Hook                   — Uncommitted-change warning
+第1层: settings.json deny 规则     — 权限级拦截（根本不让用）
+第2层: rules/security.md           — 软规范（告诉为什么不能用）
+第3层: PreToolUse Hook             — 事件级实时正则拦截
+第4层: PostToolUse Hook            — 事后审计（每笔变更可追溯）
+第5层: SubAgent 工具白名单         — 角色隔离（默认只读零风险）
+第6层: Stop Hook                   — 退出保护（四步质量门）
 ```
 
-## Maintenance
+## 维护
 
 ```powershell
-# Update config from upstream
+# 从远端更新配置
 cd ~/.claude-config && git pull
 powershell -File setup.ps1
 
-# View today's audit log
+# 查看今天的审计日志
 cat ~/.claude/audit/$(Get-Date -Format 'yyyy-MM-dd').log
 
-# Check which skills are loaded
-# Ask in Claude Code: "What skills are available?"
+# 查看已加载的 Skills（在 Claude Code 对话中问）
+# "What skills are available?"
 
-# Update Superpowers plugin
+# 更新 Superpowers 插件
 claude plugin update superpowers@claude-plugins-official
 ```
 
-## Customization
+## 扩展
 
-1. **Add a personal rule**: Create `~/.claude/rules/<name>.md` with YAML frontmatter
-2. **Add a sub-agent**: Create `~/.claude/agents/<name>.md` with `tools` + `model` frontmatter
-3. **Add a command**: Create `~/.claude/commands/<name>.md`
-4. **Add a hook**: Write a `.ps1` script, register in `settings.json`
+1. **添加个人规则**: 创建 `~/.claude/rules/<名称>.md`，带 YAML frontmatter 声明生效路径
+2. **添加子代理**: 创建 `~/.claude/agents/<名称>.md`，配置 `tools` + `model`
+3. **添加命令**: 创建 `~/.claude/commands/<名称>.md`
+4. **添加 Hook**: 写 `.ps1` 脚本，在 `settings.json` 中注册
 
-## Platform Notes
+## 环境说明
 
-- **Windows**: PowerShell 5.1 requires ASCII-only `.ps1` scripts. All hooks are pure ASCII.
-- **DeepSeek**: Only 2 effective model tiers (haiku → flash, sonnet/opus → pro). Agent `model:` field only distinguishes haiku from others.
-- **MCP**: Not configured yet (planned: GitHub MCP server).
+- **Windows**: PowerShell 5.1 要求 `.ps1` 脚本为纯 ASCII，所有 Hook 已做兼容处理
+- **DeepSeek**: 仅 2 个有效模型分级（haiku → flash，sonnet/opus → pro），agent 中 `model:` 字段仅能区分 haiku
+- **MCP**: 尚未配置（计划接入 GitHub MCP Server）
 
-## References
+## 参考资源
 
-- Course: "Claude Code Engineering Practice" (Geektime, Huang Jia)
-- Specification: [Agent Skills Protocol](https://agentskills.io/specification)
+- 课程: 极客时间《Claude Code 工程化实战》(黄佳老师)
+- 规范: [Agent Skills Protocol](https://agentskills.io/specification)
 - MCP: [Model Context Protocol](https://modelcontextprotocol.io)
-- Companion repo: [huangjia2019/claude-code-engineering](https://github.com/huangjia2019/claude-code-engineering)
+- 配套仓库: [huangjia2019/claude-code-engineering](https://github.com/huangjia2019/claude-code-engineering)
