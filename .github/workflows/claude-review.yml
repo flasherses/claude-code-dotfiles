@@ -1,0 +1,104 @@
+name: Claude Code PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      review_type:
+        description: 'Review type (quick / full / security)'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - full
+          - security
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only origin/${{ github.base_ref }}...HEAD > changed-files.txt
+          else
+            git diff --name-only HEAD~1 > changed-files.txt
+          fi
+          echo "Changed files:"
+          cat changed-files.txt
+          echo "count=$(wc -l < changed-files.txt)" >> $GITHUB_OUTPUT
+
+      - name: Claude Code Review (quick)
+        if: ${{ github.event.inputs.review_type == 'quick' || github.event_name == 'pull_request' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          FILES=$(cat changed-files.txt | tr '\n' ' ')
+          RESULT=$(claude -p "Review these changed files for bugs and security issues: $FILES. Report only Critical and Warning level issues. Be concise." \
+            --allowedTools "Read,Grep,Glob" \
+            --output-format json 2>&1)
+          echo "$RESULT" > review-result.json
+          echo "Review completed"
+
+      - name: Claude Code Review (full)
+        if: ${{ github.event.inputs.review_type == 'full' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          FILES=$(cat changed-files.txt | tr '\n' ' ')
+          RESULT=$(claude -p "Do a comprehensive code review for these files: $FILES. Check for bugs, security vulnerabilities, performance issues, and code quality problems." \
+            --allowedTools "Read,Grep,Glob" \
+            --output-format json 2>&1)
+          echo "$RESULT" > review-result.json
+
+      - name: Claude Code Review (security)
+        if: ${{ github.event.inputs.review_type == 'security' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          FILES=$(cat changed-files.txt | tr '\n' ' ')
+          RESULT=$(claude -p "Do a security audit for these files: $FILES. Scan for OWASP Top-10 vulnerabilities, hardcoded secrets, injection risks, and unsafe patterns." \
+            --allowedTools "Read,Grep,Glob" \
+            --output-format json 2>&1)
+          echo "$RESULT" > review-result.json
+
+      - name: Post review summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const result = fs.readFileSync('review-result.json', 'utf8');
+            const changedCount = '${{ steps.changed-files.outputs.count }}';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Claude Code Review\n\n**Files reviewed**: ${changedCount}\n\n<details>\n<summary>Review Result</summary>\n\n\`\`\`\n${result.substring(0, 5000)}\n\`\`\`\n\n</details>\n\n> Automated review by Claude Code. Critical issues should be fixed before merge.`
+            });
+
+      - name: Check for critical issues
+        run: |
+          if grep -qi "critical\|CRITICAL\|SQL injection\|hardcoded secret\|password\|token\|api_key" review-result.json; then
+            echo "WARNING: Critical issues detected. Review required before merge."
+          else
+            echo "No critical issues detected."
+          fi

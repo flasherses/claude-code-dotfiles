@@ -1,0 +1,216 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check VERSION file
+        run: |
+          if [ ! -f VERSION ]; then
+            echo "ERROR: VERSION file missing"
+            exit 1
+          fi
+          echo "Version: $(cat VERSION)"
+
+      - name: Validate settings.example.json
+        run: |
+          python3 -m json.tool settings.example.json > /dev/null
+          echo "PASS: settings.example.json is valid JSON"
+
+      - name: Check PowerShell hook syntax
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem hooks/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -eq 0) {
+              Write-Host "  PASS: $($_.Name)"
+            } else {
+              Write-Host "  FAIL: $($_.Name)"
+              $parseErrors | ForEach-Object { Write-Host "    $_" }
+              $errors += $_.Name
+            }
+          }
+          if ($errors.Count -gt 0) { exit 1 }
+
+      - name: Check Bash hook syntax
+        run: |
+          errors=0
+          for f in hooks/*.sh; do
+            if bash -n "$f" 2>&1; then
+              echo "  PASS: $f"
+            else
+              echo "  FAIL: $f"
+              errors=$((errors+1))
+            fi
+          done
+          if [ $errors -gt 0 ]; then exit 1; fi
+
+      - name: Validate rules have YAML frontmatter
+        run: |
+          errors=0
+          for f in rules/*.md; do
+            first_line=$(head -1 "$f")
+            if [ "$first_line" = "---" ]; then
+              echo "  PASS: $f has frontmatter"
+            else
+              echo "  FAIL: $f missing YAML frontmatter (must start with ---)"
+              errors=$((errors+1))
+            fi
+          done
+          if [ $errors -gt 0 ]; then exit 1; fi
+
+      - name: Validate agents have required frontmatter
+        run: |
+          errors=0
+          for f in agents/*.md; do
+            name=$(python3 -c "
+          import yaml, sys
+          with open('$f') as fh:
+              content = fh.read()
+          if content.startswith('---'):
+              parts = content.split('---', 2)
+              if len(parts) >= 3:
+                  fm = yaml.safe_load(parts[1])
+                  print(fm.get('name',''))
+          " 2>/dev/null)
+            desc=$(python3 -c "
+          import yaml, sys
+          with open('$f') as fh:
+              content = fh.read()
+          if content.startswith('---'):
+              parts = content.split('---', 2)
+              if len(parts) >= 3:
+                  fm = yaml.safe_load(parts[1])
+                  print(fm.get('description',''))
+          " 2>/dev/null)
+            tools=$(python3 -c "
+          import yaml, sys
+          with open('$f') as fh:
+              content = fh.read()
+          if content.startswith('---'):
+              parts = content.split('---', 2)
+              if len(parts) >= 3:
+                  fm = yaml.safe_load(parts[1])
+                  print(fm.get('tools',''))
+          " 2>/dev/null)
+            if [ -z "$name" ]; then
+              echo "  FAIL: $f — missing 'name' in frontmatter"
+              errors=$((errors+1))
+            elif [ -z "$desc" ]; then
+              echo "  FAIL: $f — missing 'description' in frontmatter"
+              errors=$((errors+1))
+            elif [ -z "$tools" ]; then
+              echo "  FAIL: $f — missing 'tools' in frontmatter"
+              errors=$((errors+1))
+            else
+              echo "  PASS: $f (name=$name, tools=$tools)"
+            fi
+          done
+          if [ $errors -gt 0 ]; then exit 1; fi
+
+      - name: Install Python YAML parser
+        run: pip install pyyaml
+
+      - name: Validate skills have required frontmatter
+        run: |
+          errors=0
+          for f in skills/*/SKILL.md; do
+            name=$(python3 -c "
+          import yaml, sys
+          with open('$f') as fh:
+              content = fh.read()
+          if content.startswith('---'):
+              parts = content.split('---', 2)
+              if len(parts) >= 3:
+                  fm = yaml.safe_load(parts[1])
+                  print(fm.get('name',''))
+          " 2>/dev/null)
+            desc=$(python3 -c "
+          import yaml, sys
+          with open('$f') as fh:
+              content = fh.read()
+          if content.startswith('---'):
+              parts = content.split('---', 2)
+              if len(parts) >= 3:
+                  fm = yaml.safe_load(parts[1])
+                  print(fm.get('description',''))
+          " 2>/dev/null)
+            if [ -z "$name" ]; then
+              echo "  FAIL: $f — missing 'name'"
+              errors=$((errors+1))
+            elif [ -z "$desc" ]; then
+              echo "  FAIL: $f — missing 'description'"
+              errors=$((errors+1))
+            else
+              echo "  PASS: $f (name=$name)"
+            fi
+          done
+          if [ $errors -gt 0 ]; then exit 1; fi
+
+      - name: Check CLAUDE.md
+        run: |
+          if [ ! -f CLAUDE.md ]; then
+            echo "ERROR: CLAUDE.md missing"
+            exit 1
+          fi
+          lines=$(wc -l < CLAUDE.md)
+          if [ "$lines" -lt 20 ]; then
+            echo "FAIL: CLAUDE.md too short ($lines lines, minimum 20)"
+            exit 1
+          elif [ "$lines" -gt 500 ]; then
+            echo "WARNING: CLAUDE.md quite long ($lines lines, consider splitting to rules/)"
+          else
+            echo "PASS: CLAUDE.md ($lines lines)"
+          fi
+
+      - name: Check directory structure
+        run: |
+          errors=0
+          for dir in rules agents commands hooks skills; do
+            if [ ! -d "$dir" ]; then
+              echo "FAIL: $dir/ directory missing"
+              errors=$((errors+1))
+            else
+              echo "PASS: $dir/ exists"
+            fi
+          done
+          if [ $errors -gt 0 ]; then exit 1; fi
+
+      - name: Validate plugin.json
+        run: |
+          if [ -f .claude-plugin/plugin.json ]; then
+            python3 -m json.tool .claude-plugin/plugin.json > /dev/null
+            echo "PASS: .claude-plugin/plugin.json is valid JSON"
+          else
+            echo "INFO: No plugin.json found (optional)"
+          fi
+
+      - name: Check token analyzer syntax
+        run: |
+          if [ -f scripts/analyze-tokens.sh ]; then
+            bash -n scripts/analyze-tokens.sh && echo "PASS: scripts/analyze-tokens.sh"
+          fi
+        shell: bash
+
+      - name: Summary
+        run: |
+          echo "=== Validation Summary ==="
+          echo "VERSION: $(cat VERSION)"
+          echo "Rules:   $(ls rules/*.md 2>/dev/null | wc -l) files"
+          echo "Agents:  $(ls agents/*.md 2>/dev/null | wc -l) files"
+          echo "Commands: $(ls commands/*.md 2>/dev/null | wc -l) files"
+          echo "Hooks:   $(ls hooks/* 2>/dev/null | wc -l) files ($(ls hooks/*.ps1 2>/dev/null | wc -l) ps1 + $(ls hooks/*.sh 2>/dev/null | wc -l) sh)"
+          echo "Skills:  $(ls -d skills/*/ 2>/dev/null | wc -l) skills"
+          echo "Status:  ALL CHECKS PASSED"

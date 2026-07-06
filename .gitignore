@@ -1,0 +1,35 @@
+# 敏感信息
+settings.json
+
+# 自动生成/缓存
+cache/
+backups/
+downloads/
+paste-cache/
+file-history/
+shell-snapshots/
+telemetry/
+sessions/
+session-env/
+tasks/
+audit/
+state/
+
+# Marketplace skills (reinstall on new machine), allow hand-crafted
+skills/*
+!skills/git-rollback/
+!skills/project-engineering-init/
+plugins/
+
+# 项目关联数据
+projects/
+
+# 计划文件
+plans/
+
+# 大文件
+history.jsonl
+
+# 系统文件
+.last-cleanup
+Thumbs.db

@@ -1,0 +1,27 @@
+{
+  "name": "claude-code-dotfiles",
+  "version": "1.0.0",
+  "description": "Claude Code user-level engineering system: 4 agents, 14 skills, 8 hooks, 4 commands, multi-platform support. Based on the Claude Code Engineering Practice course.",
+  "author": {
+    "name": "flasherses",
+    "url": "https://github.com/flasherses/claude-code-dotfiles"
+  },
+  "homepage": "https://github.com/flasherses/claude-code-dotfiles",
+  "repository": "https://github.com/flasherses/claude-code-dotfiles",
+  "license": "MIT",
+  "minClaudeVersion": "1.5.0",
+  "keywords": [
+    "engineering-system",
+    "code-review",
+    "security-audit",
+    "hooks",
+    "multi-platform",
+    "skills",
+    "agents"
+  ],
+  "categories": [
+    "engineering",
+    "security",
+    "productivity"
+  ]
+}
