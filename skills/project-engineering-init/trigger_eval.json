@@ -1,0 +1,82 @@
+[
+  {
+    "query": "帮我为这个项目搭建工程化体系",
+    "should_trigger": true
+  },
+  {
+    "query": "set up Claude Code for this project, create all the config files",
+    "should_trigger": true
+  },
+  {
+    "query": "初始化工程体系，生成 CLAUDE.md 和 rules",
+    "should_trigger": true
+  },
+  {
+    "query": "I just created a new Spring Boot project, can you set up the Claude Code engineering system?",
+    "should_trigger": true
+  },
+  {
+    "query": "为这个项目配置 Claude",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我搭建项目级配置",
+    "should_trigger": true
+  },
+  {
+    "query": "这个项目还没有 .claude 目录，帮我搞一套",
+    "should_trigger": true
+  },
+  {
+    "query": "create project config for my new repo",
+    "should_trigger": true
+  },
+  {
+    "query": "build engineering system for this project",
+    "should_trigger": true
+  },
+  {
+    "query": "我需要一套完整的 Claude Code 项目配置",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我更新 CLAUDE.md，加上新的构建命令",
+    "should_trigger": false
+  },
+  {
+    "query": "这个项目的代码风格规范是什么？帮我改一下 rules",
+    "should_trigger": false
+  },
+  {
+    "query": "review this code for bugs",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我写一个 Spring Boot Controller",
+    "should_trigger": false
+  },
+  {
+    "query": "what does git status do?",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我改一下 .claude/settings.json 里的 allow 规则",
+    "should_trigger": false
+  },
+  {
+    "query": "run the tests and tell me if they pass",
+    "should_trigger": false
+  },
+  {
+    "query": "这个项目的入口文件在哪里？",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我创建一个新的 MCP tool",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I configure the database connection?",
+    "should_trigger": false
+  }
+]

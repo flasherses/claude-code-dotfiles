@@ -15,8 +15,10 @@ tasks/
 audit/
 state/
 
-# 第三方内容（通过 marketplace 重装）
-skills/
+# Marketplace skills (reinstall on new machine), allow hand-crafted
+skills/*
+!skills/git-rollback/
+!skills/project-engineering-init/
 plugins/
 
 # 项目关联数据
