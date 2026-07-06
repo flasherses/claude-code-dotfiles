@@ -1,0 +1,61 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "<你的 DeepSeek API Key>",
+    "ANTHROPIC_MODEL": "deepseek-v4-pro[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro[1m]",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "effortLevel": "high",
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(curl*|*sh*)",
+      "Bash(curl*|*bash*)",
+      "Bash(wget*|*sh*)",
+      "Bash(git push*--force*)",
+      "Bash(git push*-f*)",
+      "Bash(chmod 777*)",
+      "Bash(dd if=*)",
+      "Bash(mkfs.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -NonInteractive -File \"C:\\Users\\PC\\.claude\\hooks\\deny-dangerous.ps1\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -NonInteractive -File \"C:\\Users\\PC\\.claude\\hooks\\audit-edit.ps1\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -NonInteractive -File \"C:\\Users\\PC\\.claude\\hooks\\check-uncommitted.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}
