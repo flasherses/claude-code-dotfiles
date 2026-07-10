@@ -65,9 +65,6 @@ if (Test-Path "$ClaudeDir\settings.json") {
     $example = $example -replace '__CLAUDE_HOME__', $claudeHome
     $example | Set-Content -Path "$ClaudeDir\settings.json" -Encoding utf8
     Write-Host "  OK  settings.json generated (paths adapted to: $ClaudeDir)"
-    Write-Host ""
-    Write-Host "  !!! IMPORTANT: Edit ~/.claude/settings.json and add your API Key !!!"
-    Write-Host "      notepad $ClaudeDir\settings.json"
 }
 
 # ── Step 4: Create runtime directories ────────────────────
@@ -144,9 +141,8 @@ Write-Host "  4 Commands  — /review, /audit, /full-review, /rollback"
 Write-Host "  2 Rules     — security.md, code-style.md"
 Write-Host ""
 Write-Host "Next steps:"
-Write-Host "  1. Edit settings.json and add your API Key"
-Write-Host "  2. Start a new Claude Code session"
-Write-Host "  3. Verify: ask 'What are my coding preferences?'"
-Write-Host "  4. In any project: say 'build the engineering system for this project'"
-Write-Host "  5. Run health check: cd ~/.claude-config && powershell -File scripts/health-check.ps1"
+Write-Host "  1. Start a new Claude Code session"
+Write-Host "  2. Verify: ask 'What are my coding preferences?'"
+Write-Host "  3. In any project: say 'build the engineering system for this project'"
+Write-Host "  4. Run health check: cd ~/.claude-config && powershell -File scripts/health-check.ps1"
 Write-Host ""
